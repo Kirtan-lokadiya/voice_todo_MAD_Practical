@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/task_provider.dart';
 import '../models/task.dart';
+import 'package:hive/hive.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -13,6 +17,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   late stt.SpeechToText _speech;
+  late FlutterTts _tts;
   bool _isListening = false;
   String _transcription = 'Press mic to start speaking';
 
@@ -20,6 +25,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
+    _tts = FlutterTts();
+    _initTTS();
+  }
+
+  Future<void> _initTTS() async {
+    await _tts.setLanguage("en-US");
+    await _tts.setSpeechRate(0.5);
+    await _tts.setVolume(1.0);
+    await _tts.setPitch(1.0);
+  }
+
+  Future<void> _speak(String text) async {
+    await _tts.stop(); // stop any ongoing speech
+    await _tts.speak(text);
   }
 
   Future<void> _listen() async {
@@ -28,10 +47,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (available) {
         setState(() => _isListening = true);
         _speech.listen(onResult: (result) {
-          setState(() {
-            _transcription = result.recognizedWords;
-          });
-          _tryAddTask(result.recognizedWords);
+          final words = result.recognizedWords;
+          setState(() => _transcription = words);
+          _tryAddTask(words);
         });
       }
     } else {
@@ -40,17 +58,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  void _tryAddTask(String words) {
-    final command = words.toLowerCase();
-    final match = RegExp(r'^(add task|create task)\s+(.+)$')
-        .firstMatch(command);
-    if (match != null) {
-      final title = match.group(2)!;
+void _tryAddTask(String words) async {
+  final command = words.toLowerCase();
+  final match = RegExp(r'^(add task|create task)\s+(.+)$').firstMatch(command);
+
+  if (match != null) {
+    final title = match.group(2)!;
+    final connectivity = await Connectivity().checkConnectivity();
+    final isOnline = connectivity != ConnectivityResult.none;
+
+    if (isOnline) {
       ref.read(taskListProvider.notifier).add(title);
-      // Clear transcription to avoid duplicate adds
+      _speak("Task added: $title");
       setState(() => _transcription = 'Added: $title');
+    } else {
+      final box = Hive.box('offline_tasks');
+      await box.add(title);
+      _speak("You're offline. Task saved locally: $title");
+      setState(() => _transcription = 'Saved offline: $title');
     }
+  } else {
+    _speak("Sorry, I didn’t understand that. Please say: Add task followed by your task.");
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
