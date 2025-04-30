@@ -16,18 +16,37 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  Future<void> _syncOfflineTasks() async {
+  final connectivity = await Connectivity().checkConnectivity();
+  if (connectivity != ConnectivityResult.none) {
+    final box = Hive.box('offline_tasks');
+    final tasks = box.values.cast<String>().toList();
+
+    for (final title in tasks) {
+      ref.read(taskListProvider.notifier).add(title);
+    }
+
+    await box.clear();
+    if (tasks.isNotEmpty) {
+      _speak("${tasks.length} offline task(s) synced.");
+    }
+  }
+}
+
   late stt.SpeechToText _speech;
   late FlutterTts _tts;
   bool _isListening = false;
   String _transcription = 'Press mic to start speaking';
 
-  @override
-  void initState() {
-    super.initState();
-    _speech = stt.SpeechToText();
-    _tts = FlutterTts();
-    _initTTS();
-  }
+@override
+void initState() {
+  super.initState();
+  _speech = stt.SpeechToText();
+  _tts = FlutterTts();
+  _initTTS();
+  _syncOfflineTasks(); // 👈 sync any offline tasks
+}
+
 
   Future<void> _initTTS() async {
     await _tts.setLanguage("en-US");
