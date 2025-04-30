@@ -2,10 +2,14 @@ import 'package:uuid/uuid.dart';
 
 class Task {
   final String id;
-  final String title;
+  String title;
   bool isCompleted;
 
-  Task({required this.title})
-      : id = const Uuid().v4(),
-        isCompleted = false;
+  /// Allows reuse of ID and isCompleted status
+  Task({
+    required this.title,
+    String? id,
+    bool? isCompleted,
+  })  : id = id ?? const Uuid().v4(),
+        isCompleted = isCompleted ?? false;
 }

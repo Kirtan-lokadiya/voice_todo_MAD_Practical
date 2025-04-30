@@ -9,14 +9,33 @@ class TaskList extends StateNotifier<List<Task>> {
   }
 
   void toggle(String id) {
-    state = [
-      for (final task in state)
-        if (task.id == id)
-          Task(title: task.title)
-            ..isCompleted = !task.isCompleted
-        else
-          task,
-    ];
+    state = state.map((task) {
+      if (task.id == id) {
+        return Task(
+          title: task.title,
+          id: task.id,
+          isCompleted: !task.isCompleted,
+        );
+      }
+      return task;
+    }).toList();
+  }
+
+  void edit(String id, String newTitle) {
+    state = state.map((task) {
+      if (task.id == id) {
+        return Task(
+          title: newTitle,
+          id: task.id,
+          isCompleted: task.isCompleted,
+        );
+      }
+      return task;
+    }).toList();
+  }
+
+  void remove(String id) {
+    state = state.where((task) => task.id != id).toList();
   }
 }
 
