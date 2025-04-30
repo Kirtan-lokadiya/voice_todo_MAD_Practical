@@ -1,3 +1,4 @@
+import '../services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -6,6 +7,7 @@ import '../providers/task_provider.dart';
 import '../models/task.dart';
 import 'package:hive/hive.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+
 
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -87,9 +89,17 @@ void _tryAddTask(String words) async {
     final isOnline = connectivity != ConnectivityResult.none;
 
     if (isOnline) {
-      ref.read(taskListProvider.notifier).add(title);
-      _speak("Task added: $title");
-      setState(() => _transcription = 'Added: $title');
+      try {
+        await ApiService.sendTask(title);
+        ref.read(taskListProvider.notifier).add(title);
+        _speak("Task added and synced: $title");
+        setState(() => _transcription = 'Synced: $title');
+      } catch (e) {
+        _speak("Task added locally. Sync failed.");
+        setState(() => _transcription = 'Sync failed. Saved locally.');
+        final box = Hive.box('offline_tasks');
+        await box.add(title);
+      }
     } else {
       final box = Hive.box('offline_tasks');
       await box.add(title);
@@ -100,6 +110,7 @@ void _tryAddTask(String words) async {
     _speak("Sorry, I didn’t understand that. Please say: Add task followed by your task.");
   }
 }
+
 
 
   @override
